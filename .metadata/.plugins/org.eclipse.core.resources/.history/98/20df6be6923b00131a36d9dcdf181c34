@@ -1,0 +1,60 @@
+import java.io.FileNotFoundException;
+
+import edu.rit.pj2.Job;
+
+public class NumberSatClu extends Job {
+
+	@Override
+	public void main(String[] args) {
+		if (args.length != 1)
+		    usage();
+
+		int variables; // number of variables
+		int clauses; // Number of clauses
+		final long[] neg; // store negative variables
+		final long[] pos; // stores positive variables
+		final Scanner src;
+
+		try {
+		    src = new Scanner(new File(args[0])); // read file provided in
+							  // command line
+		    if (src.next().equals("p") && src.next().equals("cnf")) { // checking
+									      // format
+			variables = Integer.parseInt(src.next());
+			clauses = Integer.parseInt(src.next());
+			pos = new long[clauses];
+			neg = new long[clauses];
+			src.nextLine();
+			for (int i = 0; i < clauses; i++) {
+
+			    while (src.hasNextInt()) {
+				int temp;
+				temp = src.nextInt();
+				if (temp == 0) { // end of clause
+				    break;
+				} else if (temp < 0) { // neg number
+				    temp = temp * -1;
+				    neg[i] = neg[i] | 1L << temp - 1;
+				} else { // pos number
+				    pos[i] = pos[i] | 1L << temp - 1;
+				}
+			    }
+			}
+			}catch(FileNotFoundException e){}
+		
+	}
+
+	/**
+	 * 
+	 * usage: Prints usgae info Date: Sep 28, 2013
+	 * 
+	 * @author: Trushank void
+	 * 
+	 */
+	private static void usage() {
+		System.err
+				.println("Usage: java pj2 jar=<jarfile> NumberSatClu <file> <K>");
+		System.exit(0);
+	}
+
+}

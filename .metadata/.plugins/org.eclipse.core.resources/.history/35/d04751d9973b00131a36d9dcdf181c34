@@ -1,0 +1,170 @@
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.util.Scanner;
+
+import edu.rit.pj2.Job;
+import edu.rit.pj2.LongVbl;
+import edu.rit.pj2.Loop;
+import edu.rit.pj2.Task;
+import edu.rit.pj2.Tuple;
+import edu.rit.util.LongRange;
+
+public class NumberSatClu extends Job {
+
+	@Override
+	public void main(String[] args) {
+		if (args.length != 1)
+			usage();
+
+		int variables; // number of variables
+		int clauses; // Number of clauses
+		final long[] neg; // store negative variables
+		final long[] pos; // stores positive variables
+		final Scanner src;
+		int K = 0;
+		int CF = 10;
+
+		try {
+			src = new Scanner(new File(args[0])); // read file provided in
+			// command line
+			K = Integer.parseInt(args[1]);
+			if (src.next().equals("p") && src.next().equals("cnf")) { // checking
+				// format
+				variables = Integer.parseInt(src.next());
+				clauses = Integer.parseInt(src.next());
+				pos = new long[clauses];
+				neg = new long[clauses];
+				src.nextLine();
+				for (int i = 0; i < clauses; i++) {
+
+					while (src.hasNextInt()) {
+						int temp;
+						temp = src.nextInt();
+						if (temp == 0) { // end of clause
+							break;
+						} else if (temp < 0) { // neg number
+							temp = temp * -1;
+							neg[i] = neg[i] | 1L << temp - 1;
+						} else { // pos number
+							pos[i] = pos[i] | 1L << temp - 1;
+						}
+					}
+				}
+				final long full = (1L << variables) - 1L; // iterate till length
+				// variables
+				// Partition the iterations into chunks for the worker tasks.
+				for (LongRange chunk : new LongRange(0, full).subranges(K * CF))
+					putTuple(new ChunkTuple(chunk));
+				for(int i=0;i<K;i++){
+					putTuple(new InputTuple(pos,neg,full));
+				}
+			}
+		
+		} catch (FileNotFoundException e) {
+		}
+
+	}
+
+	/**
+	 * 
+	 * usage: Prints usgae info Date: Sep 28, 2013
+	 * 
+	 * @author: Trushank void
+	 * 
+	 */
+	private static void usage() {
+		System.err
+				.println("Usage: java pj2 jar=<jarfile> NumberSatClu <file> <K>");
+		throw new IllegalArgumentException();
+	}
+
+	/**
+	 * 
+	 * @author Trushank
+	 * 
+	 */
+	public static class WorkerTask extends Task {
+
+		@Override
+		public void main(String[] arg0) throws Exception {
+
+			// Compute chunks of iterations.
+			ChunkTuple template = new ChunkTuple();
+			ChunkTuple chunk;
+			final long[] pos;
+			final long[] neg;
+			final long full;
+			
+			InputTuple inp=(InputTuple)takeTuple(new InputTuple());
+			pos=inp.pos;
+			neg=inp.neg;
+			full=inp.full;
+			
+			while ((chunk = (ChunkTuple) tryToTakeTuple(template)) != null) {
+				final LongVbl count = new LongVbl.Sum(0); // final result
+
+				parallelFor(chunk.range.lb(), chunk.range.ub()).exec(new Loop() {
+					LongVbl thrdCount; // local result
+
+					public void start() {
+						thrdCount = (LongVbl) threadLocal(count); // assigning
+						// local count
+						// with final
+					}
+
+					public void run(long A) {
+
+						long oppA = A ^ full; // Inverse of mask
+						boolean isSAT = true;
+
+						for (int i = 0; i < pos.length; i++) {
+							// Checking if clause equates to greater than 0
+							if ((pos[i] & A) <= 0 && (neg[i] & oppA) <= 0) {
+								isSAT = false;
+								// if not don't check rest of the clauses
+								break;
+							}
+
+						}
+						// if all clauses equate to greater than 1
+						if (isSAT == true) {
+							thrdCount.item++;
+						}
+					}
+				});
+			}
+		}
+	}
+
+	/**
+	 * 
+	 * @author Trushank
+	 * 
+	 */
+	private static class ChunkTuple extends Tuple {
+		public LongRange range;
+
+		public ChunkTuple() {
+		}
+
+		public ChunkTuple(LongRange range) {
+			this.range = range;
+		}
+	}
+	
+	private static class InputTuple extends Tuple {
+		public long[] pos;
+		public long[] neg;
+		long full;
+		
+		public InputTuple() {
+		}
+
+		public InputTuple(long[] pos,long[] neg, long full) {
+			this.pos=pos;
+			this.neg=neg;
+			this.full=full;
+		}
+	}
+
+}
